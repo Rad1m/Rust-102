@@ -25,6 +25,19 @@ impl Database {
     fn insert(&mut self, key: &String, value: &String) {
         self.map.insert(key.to_string(), value.to_string());
     }
+
+    fn flush(&self) -> std::io::Result<()> {
+        let mut contents = String::new();
+        for (key, value) in &self.map {
+            let kvpair = format!("{}\t{}\n", key, value);
+            contents.push_str(&kvpair);
+            // contents.push_str(&key);
+            // contents.push('\t');
+            // contents.push_str(&value);
+            // contents.push('\n');
+        }
+        fs::write("kv.db", contents)
+    }
 }
 
 fn main() {
@@ -34,5 +47,5 @@ fn main() {
     let mut database = Database::new().expect("Database::new() crashed");
     database.insert(&key.to_uppercase(), &value);
     database.insert(&key, &value);
-    println!("The key is {} and the value is {}.",&key, &value);
+    database.flush().unwrap();
 }
