@@ -7,6 +7,7 @@ struct Database {
     // Structs are STACK allocated
     // map is just a name, it can be anything
     map: HashMap<String, String>,
+    flush: bool,
 }
 
 impl Database {
@@ -18,7 +19,7 @@ impl Database {
             let (key, value) = line.split_once('\t').expect("Corrupt database");
             map.insert(key.to_owned(), value.to_owned()); // using to_owned to own borrowed string
         }
-        Ok(Database { map})
+        Ok(Database { map, flush: false})
     }
 
     // method takes self as a first argument, this is different from function
@@ -26,18 +27,28 @@ impl Database {
         self.map.insert(key.to_string(), value.to_string());
     }
 
-    fn flush(&self) -> std::io::Result<()> {
-        let mut contents = String::new();
-        for (key, value) in &self.map {
-            let kvpair = format!("{}\t{}\n", key, value);
-            contents.push_str(&kvpair);
-            // contents.push_str(&key);
-            // contents.push('\t');
-            // contents.push_str(&value);
-            // contents.push('\n');
-        }
-        fs::write("kv.db", contents)
+    fn flush(&mut self) -> std::io::Result<()> {
+        self.flush = true;
+        do_flush(&self)
     }
+}
+
+impl Drop for Database {
+    fn drop(&mut self) {
+        if !self.flush {
+            let _ = do_flush(self);
+        }
+    }
+}
+
+fn do_flush(database: &Database) -> std::io::Result<()> {
+    println!("Do flush called");
+    let mut contents = String::new();
+    for (key, value) in &database.map {
+        let kvpair = format!("{}\t{}\n", key, value);
+        contents.push_str(&kvpair);
+    }
+    std::fs::write("kv.db", contents)
 }
 
 fn main() {
@@ -47,5 +58,8 @@ fn main() {
     let mut database = Database::new().expect("Database::new() crashed");
     database.insert(&key.to_uppercase(), &value);
     database.insert(&key, &value);
-    database.flush().unwrap();
+    match database.flush() {
+        Ok(()) => println!("YAY!"),
+        Err(err) => println!("OH NOS! Error! {}", err),
+    }
 }
